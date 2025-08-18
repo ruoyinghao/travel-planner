@@ -11,14 +11,19 @@ const RouteOptimizer: React.FC = () => {
   const [totalDuration, setTotalDuration] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [returnToOrigin, setReturnToOrigin] = useState<boolean>(false);
+  const [finalDestination, setFinalDestination] = useState<string>('');
+  const [inputFinalDestination, setInputFinalDestination] = useState<string>('');
+  const [useStartingAsFinal, setUseStartingAsFinal] = useState<boolean>(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const destinationInputRef = useRef<HTMLInputElement>(null);
   const originInputRef = useRef<HTMLInputElement>(null);
+  const finalDestinationInputRef = useRef<HTMLInputElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null);
   const destinationAutocomplete = useRef<google.maps.places.Autocomplete | null>(null);
   const originAutocomplete = useRef<google.maps.places.Autocomplete | null>(null);
+  const finalDestinationAutocomplete = useRef<google.maps.places.Autocomplete | null>(null);
   const markers = useRef<google.maps.Marker[]>([]);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
 
@@ -38,6 +43,14 @@ const RouteOptimizer: React.FC = () => {
     if (place?.formatted_address) {
       setOrigin(place.formatted_address);
       setInputOrigin('');
+    }
+  }, []);
+
+  const handleFinalDestinationPlaceSelect = useCallback((): void => {
+    const place = finalDestinationAutocomplete.current?.getPlace();
+    if (place?.formatted_address) {
+      setFinalDestination(place.formatted_address);
+      setInputFinalDestination('');
     }
   }, []);
 
@@ -143,10 +156,20 @@ const RouteOptimizer: React.FC = () => {
 
         originAutocomplete.current.addListener('place_changed', handleOriginPlaceSelect);
       }
+
+      // Initialize Places Autocomplete for final destination
+      if (finalDestinationInputRef.current) {
+        finalDestinationAutocomplete.current = new window.google.maps.places.Autocomplete(finalDestinationInputRef.current, {
+          types: ['establishment', 'geocode'],
+          fields: ['place_id', 'formatted_address', 'name', 'types']
+        });
+
+        finalDestinationAutocomplete.current.addListener('place_changed', handleFinalDestinationPlaceSelect);
+      }
     } catch (error) {
       console.error('Error loading Google Maps:', error);
     }
-  }, [apiKey, handleDestinationPlaceSelect, handleOriginPlaceSelect]);
+  }, [apiKey, handleDestinationPlaceSelect, handleOriginPlaceSelect, handleFinalDestinationPlaceSelect]);
 
   useEffect(() => {
     if (apiKey) {
@@ -183,6 +206,17 @@ const RouteOptimizer: React.FC = () => {
     setOrigin('');
   };
 
+  const addFinalDestination = (): void => {
+    if (inputFinalDestination.trim()) {
+      setFinalDestination(inputFinalDestination.trim());
+      setInputFinalDestination('');
+    }
+  };
+
+  const clearFinalDestination = (): void => {
+    setFinalDestination('');
+  };
+
   const calculateOptimalRoute = async (): Promise<void> => {
     // Validation: need origin and at least 1 destination
     if (!origin && destinations.length < 2) {
@@ -212,9 +246,21 @@ const RouteOptimizer: React.FC = () => {
       let destination: string;
       let waypoints: google.maps.DirectionsWaypoint[];
 
-      if (returnToOrigin) {
-        // If returning to origin
-        destination = routeOrigin;
+      // Determine final destination based on user settings
+      let actualFinalDestination: string;
+      if (useStartingAsFinal) {
+        actualFinalDestination = routeOrigin;
+      } else if (finalDestination) {
+        actualFinalDestination = finalDestination;
+      } else if (returnToOrigin) {
+        actualFinalDestination = routeOrigin;
+      } else {
+        actualFinalDestination = destinations[destinations.length - 1];
+      }
+
+      if (returnToOrigin || useStartingAsFinal || (finalDestination && finalDestination === routeOrigin)) {
+        // Round trip or ending at start
+        destination = actualFinalDestination;
         if (origin) {
           // Custom origin: all destinations become waypoints
           waypoints = destinations.map((dest: string) => ({
@@ -229,18 +275,17 @@ const RouteOptimizer: React.FC = () => {
           }));
         }
       } else {
-        // One-way trip
+        // One-way trip with specific final destination
+        destination = actualFinalDestination;
         if (origin) {
-          // Custom origin: last destination becomes final destination
-          destination = destinations[destinations.length - 1];
-          waypoints = destinations.slice(0, -1).map((dest: string) => ({
+          // Custom origin: filter out final destination from waypoints
+          waypoints = destinations.filter(dest => dest !== finalDestination).map((dest: string) => ({
             location: dest,
             stopover: true
           }));
         } else {
-          // No custom origin: first to last destination
-          destination = destinations[destinations.length - 1];
-          waypoints = destinations.slice(1, -1).map((dest: string) => ({
+          // No custom origin: filter out first and final destinations from waypoints
+          waypoints = destinations.slice(1).filter(dest => dest !== finalDestination).map((dest: string) => ({
             location: dest,
             stopover: true
           }));
@@ -329,6 +374,12 @@ const RouteOptimizer: React.FC = () => {
   const handleOriginKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       addOrigin();
+    }
+  };
+
+  const handleFinalDestinationKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      addFinalDestination();
     }
   };
 
@@ -530,6 +581,83 @@ const RouteOptimizer: React.FC = () => {
         </div>
 
         <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>Final Destination (Optional)</h3>
+          {!finalDestination ? (
+            <>
+              <input
+                ref={finalDestinationInputRef}
+                type="text"
+                value={inputFinalDestination}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputFinalDestination(e.target.value)}
+                onKeyPress={handleFinalDestinationKeyPress}
+                placeholder="Enter final destination (optional)..."
+                style={{ width: '100%', padding: '8px', marginBottom: '5px', boxSizing: 'border-box' }}
+              />
+              <button 
+                onClick={addFinalDestination} 
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  backgroundColor: '#9C27B0', 
+                  color: 'white', 
+                  border: 'none', 
+                  cursor: 'pointer',
+                  marginBottom: '5px'
+                }}
+              >
+                Set Final Destination
+              </button>
+              <div style={{ fontSize: '11px', color: '#666' }}>
+                If not set, the last destination will be the final stop
+              </div>
+            </>
+          ) : (
+            <div style={{ 
+              padding: '10px', 
+              backgroundColor: '#F3E5F5', 
+              border: '1px solid #9C27B0', 
+              borderRadius: '4px',
+              marginBottom: '5px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#7B1FA2' }}>
+                  🏁 {finalDestination}
+                </span>
+                <button 
+                  onClick={clearFinalDestination}
+                  style={{ 
+                    padding: '4px 8px', 
+                    background: '#f44336', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '3px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div style={{ marginTop: '10px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <input
+                type="checkbox"
+                checked={useStartingAsFinal}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseStartingAsFinal(e.target.checked)}
+                style={{ marginRight: '8px' }}
+              />
+              <span style={{ fontSize: '14px' }}>Use starting location as final destination</span>
+            </label>
+            <small style={{ color: '#666', fontSize: '12px', marginLeft: '24px' }}>
+              When enabled, the route will end where it started (overrides final destination above)
+            </small>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
             <input
               type="checkbox"
@@ -583,12 +711,14 @@ const RouteOptimizer: React.FC = () => {
                   <li key={index} style={{ 
                     marginBottom: '8px',
                     fontSize: '14px',
-                    fontWeight: index === 0 || (returnToOrigin && index === optimizedRoute.length - 1) ? 'bold' : 'normal',
-                    color: index === 0 || (returnToOrigin && index === optimizedRoute.length - 1) ? '#2196F3' : 'inherit'
+                    fontWeight: index === 0 || ((returnToOrigin || useStartingAsFinal || finalDestination) && index === optimizedRoute.length - 1) ? 'bold' : 'normal',
+                    color: index === 0 ? '#2196F3' : ((returnToOrigin || useStartingAsFinal || finalDestination) && index === optimizedRoute.length - 1) ? '#9C27B0' : 'inherit'
                   }}>
                     {destination}
                     {index === 0 && ' (Starting Point)'}
                     {returnToOrigin && index === optimizedRoute.length - 1 && ' (Return to Start)'}
+                    {useStartingAsFinal && index === optimizedRoute.length - 1 && ' (Final - Back to Start)'}
+                    {finalDestination && index === optimizedRoute.length - 1 && destination === finalDestination && ' (Final Destination)'}
                   </li>
                 ))}
               </ol>
