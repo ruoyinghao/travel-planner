@@ -19,6 +19,8 @@ const RouteOptimizer: React.FC = () => {
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null);
   const destinationAutocomplete = useRef<google.maps.places.Autocomplete | null>(null);
   const originAutocomplete = useRef<google.maps.places.Autocomplete | null>(null);
+  const markers = useRef<google.maps.Marker[]>([]);
+  const geocoder = useRef<google.maps.Geocoder | null>(null);
 
   const handleDestinationPlaceSelect = useCallback((): void => {
     const place = destinationAutocomplete.current?.getPlace();
@@ -38,6 +40,65 @@ const RouteOptimizer: React.FC = () => {
       setInputOrigin('');
     }
   }, []);
+
+  const clearAllMarkers = useCallback((): void => {
+    markers.current.forEach(marker => marker.setMap(null));
+    markers.current = [];
+  }, []);
+
+  const updateMapBounds = useCallback((): void => {
+    if (!map.current || markers.current.length === 0) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    markers.current.forEach(marker => {
+      const position = marker.getPosition();
+      if (position) bounds.extend(position);
+    });
+
+    map.current.fitBounds(bounds);
+
+    // Set a minimum zoom level to avoid zooming too far out
+    google.maps.event.addListenerOnce(map.current, 'bounds_changed', () => {
+      if (map.current && map.current.getZoom() && map.current.getZoom()! > 15) {
+        map.current.setZoom(15);
+      }
+    });
+  }, []);
+
+  const addMarker = useCallback((address: string, isOrigin: boolean = false): void => {
+    if (!geocoder.current || !map.current) return;
+
+    geocoder.current.geocode({ address }, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        const marker = new window.google.maps.Marker({
+          position: results[0].geometry.location,
+          map: map.current,
+          title: address,
+          icon: {
+            url: isOrigin ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            scaledSize: new window.google.maps.Size(32, 32)
+          }
+        });
+
+        markers.current.push(marker);
+        updateMapBounds();
+      }
+    });
+  }, [updateMapBounds]);
+
+  const refreshAllMarkers = useCallback((): void => {
+    clearAllMarkers();
+    
+    // Add origin marker if set
+    if (origin) {
+      addMarker(origin, true);
+    }
+
+    // Add destination markers
+    destinations.forEach(destination => {
+      addMarker(destination, false);
+    });
+  }, [origin, destinations, clearAllMarkers, addMarker]);
 
   const initializeMap = useCallback(async (): Promise<void> => {
     if (!apiKey || !mapRef.current) return;
@@ -59,6 +120,9 @@ const RouteOptimizer: React.FC = () => {
       directionsService.current = new window.google.maps.DirectionsService();
       directionsRenderer.current = new window.google.maps.DirectionsRenderer();
       directionsRenderer.current.setMap(map.current);
+
+      // Initialize Geocoder for address to coordinates conversion
+      geocoder.current = new window.google.maps.Geocoder();
 
       // Initialize Places Autocomplete for destinations
       if (destinationInputRef.current) {
@@ -89,6 +153,13 @@ const RouteOptimizer: React.FC = () => {
       initializeMap();
     }
   }, [apiKey, initializeMap]);
+
+  // Update markers when locations change
+  useEffect(() => {
+    if (map.current) {
+      refreshAllMarkers();
+    }
+  }, [destinations, origin, refreshAllMarkers]);
 
   const addDestination = (): void => {
     if (inputDestination.trim() && !destinations.includes(inputDestination.trim())) {
