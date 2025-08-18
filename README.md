@@ -1,70 +1,55 @@
-# Getting Started with Create React App
+# Travel Route Optimizer
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React application that helps users plan the optimal travel route through multiple cities using Google Maps API.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- Add multiple cities to visit
+- Calculate the shortest duration route using Google Maps
+- Visual route display on an interactive map
+- Route optimization using Google Maps waypoint optimization
+- Total travel time calculation
 
-### `npm start`
+## Setup
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+2. **Get Google Maps API Key:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable the following APIs:
+     - Maps JavaScript API
+     - Directions API
+     - Places API
+   - Create credentials (API Key)
+   - Restrict the API key to your domain for security
 
-### `npm test`
+3. **Start the development server:**
+   ```bash
+   npm start
+   ```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Usage
 
-### `npm run build`
+1. Enter your Google Maps API key in the designated field
+2. Add cities you want to visit using the input field
+3. Click "Calculate Optimal Route" to generate the best route
+4. View the optimized route on the map with total duration
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## API Key Security
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**Important:** Never commit your API key to version control. The app requires you to enter the API key each time for security. In production, consider using environment variables or a secure backend to manage API keys.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Technologies Used
 
-### `npm run eject`
+- React with TypeScript
+- Google Maps JavaScript API
+- @googlemaps/js-api-loader
+- TypeScript for type safety
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Route Optimization
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The app uses Google Maps' built-in waypoint optimization which provides good results for most use cases. For larger numbers of cities (10+), you might want to implement a more sophisticated traveling salesman problem solver.
