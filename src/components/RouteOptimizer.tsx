@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 
+interface RouteSegment {
+  from: string;
+  to: string;
+  duration: string;
+  distance: string;
+  durationValue: number;
+  distanceValue: number;
+}
+
 const RouteOptimizer: React.FC = () => {
   const [destinations, setDestinations] = useState<string[]>([]);
   const [inputDestination, setInputDestination] = useState<string>('');
@@ -9,6 +18,8 @@ const RouteOptimizer: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>('');
   const [optimizedRoute, setOptimizedRoute] = useState<string[]>([]);
   const [totalDuration, setTotalDuration] = useState<string>('');
+  const [totalDistance, setTotalDistance] = useState<string>('');
+  const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [returnToOrigin, setReturnToOrigin] = useState<boolean>(false);
   const [finalDestination, setFinalDestination] = useState<string>('');
@@ -342,17 +353,43 @@ const RouteOptimizer: React.FC = () => {
           
           setOptimizedRoute(optimized);
           
-          // Calculate total duration
+          // Calculate total duration and distance
           let totalSeconds = 0;
-          route.legs.forEach(leg => {
-            if (leg.duration) {
+          let totalMeters = 0;
+          const segments: RouteSegment[] = [];
+
+          route.legs.forEach((leg, index) => {
+            if (leg.duration && leg.distance) {
               totalSeconds += leg.duration.value;
+              totalMeters += leg.distance.value;
+
+              // Create segment info
+              const fromLocation = index === 0 ? routeOrigin : optimized[index];
+              const toLocation = optimized[index + 1];
+              
+              segments.push({
+                from: fromLocation,
+                to: toLocation,
+                duration: leg.duration.text,
+                distance: leg.distance.text,
+                durationValue: leg.duration.value,
+                distanceValue: leg.distance.value
+              });
             }
           });
           
+          // Format total duration
           const hours = Math.floor(totalSeconds / 3600);
           const minutes = Math.floor((totalSeconds % 3600) / 60);
           setTotalDuration(`${hours}h ${minutes}m`);
+
+          // Format total distance
+          const kilometers = (totalMeters / 1000).toFixed(1);
+          const miles = (totalMeters * 0.000621371).toFixed(1);
+          setTotalDistance(`${kilometers} km (${miles} mi)`);
+
+          // Set route segments
+          setRouteSegments(segments);
         } else {
           console.error('Directions request failed due to ' + status);
           alert('Error calculating route. Please check your city names.');
@@ -696,9 +733,10 @@ const RouteOptimizer: React.FC = () => {
             <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
               {returnToOrigin ? 'Optimized Round Trip Route' : 'Optimized Route'}
             </h3>
-            <p style={{ marginBottom: '12px', fontSize: '14px' }}>
-              <strong>Total Duration:</strong> {totalDuration}
-            </p>
+            <div style={{ marginBottom: '12px', fontSize: '14px' }}>
+              <p style={{ margin: '4px 0' }}><strong>Total Duration:</strong> {totalDuration}</p>
+              <p style={{ margin: '4px 0' }}><strong>Total Distance:</strong> {totalDistance}</p>
+            </div>
             <div style={{ 
               border: '1px solid #ddd', 
               borderRadius: '4px', 
@@ -727,6 +765,38 @@ const RouteOptimizer: React.FC = () => {
               <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
                 ✓ Round trip complete - you'll end where you started
               </p>
+            )}
+
+            {/* Route Segments Breakdown */}
+            {routeSegments.length > 0 && (
+              <div style={{ marginTop: '15px' }}>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px', color: '#333' }}>
+                  Route Breakdown
+                </h4>
+                <div style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px', 
+                  backgroundColor: 'white',
+                  maxHeight: '250px',
+                  overflowY: 'auto'
+                }}>
+                  {routeSegments.map((segment, index) => (
+                    <div key={index} style={{ 
+                      padding: '10px 15px', 
+                      borderBottom: index < routeSegments.length - 1 ? '1px solid #eee' : 'none',
+                      fontSize: '13px'
+                    }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#333' }}>
+                        {index + 1}. {segment.from} → {segment.to}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666' }}>
+                        <span>🕒 {segment.duration}</span>
+                        <span>📏 {segment.distance}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
